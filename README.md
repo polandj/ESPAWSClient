@@ -50,5 +50,13 @@ ESPAWSClient aws = ESPAWSClient(service, key, secret, host);
 aws.setCACert(...);
 ```
 
+# Caveats
+
+## Time
+You must have the proper **system time** set on your device.  The library uses the *gettimeofday* internally to get the time.  The AWS signed requests are only valid for a certain amount of time, so if AWS will reject your signatures if your time is wrong.  Note that many Arduino NTP libraries do not call *settimeofday* to set the system time.  See the example sketch for a full example with NTP.
+
+## Memory
+The ESP8266 typically only has 80K of RAM total.  AWS uses somewhat large certs and TLS 1.2.  Just doing the connection requires around 20K of available HEAP.  More if you add in certificate validation.  If you're adding this to an existing Arduino program, check you're not running out of RAM.
+
 # Examples
 See the [examples directory](https://github.com/polandj/ESPAWSClient/tree/master/examples) in the source to get started.
