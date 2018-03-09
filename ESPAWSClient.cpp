@@ -19,7 +19,7 @@
 #include <TimeLib.h>
 #include <sys/time.h>
 
-AWSClient::AWSClient(String service, String key, String secret, String host,
+ESPAWSClient::ESPAWSClient(String service, String key, String secret, String host,
         String region, String TLD) {
     _awsHost = host;
     _awsRegion = region;
@@ -29,19 +29,19 @@ AWSClient::AWSClient(String service, String key, String secret, String host,
     _awsSecret = secret;
 }
 
-void AWSClient::setCustomFQDN(String fqdn) {
+void ESPAWSClient::setCustomFQDN(String fqdn) {
     _customFQDN = fqdn;
 }
 
-void AWSClient::setFingerPrint(String fp) {
+void ESPAWSClient::setFingerPrint(String fp) {
     _fingerPrint = fp;
 }
 
-/*void AWSClient::setResponseMask() {
-    STATUS | HEADERS | BODY | BODY_ON_ERROR
-}*/
+void ESPAWSClient::setResponseFields(AWSResponseFieldMask fields) {
+    _responseFields = fields;
+}
 
-String AWSClient::createRequest(String method, String uri, String payload, 
+String ESPAWSClient::createRequest(String method, String uri, String payload, 
         String contentType, String queryString) {
     char dateBuf[9], timeBuf[7];
     struct timeval tv;
@@ -66,48 +66,65 @@ String AWSClient::createRequest(String method, String uri, String payload,
     return retval;
 }
 
-AWSResponse AWSClient::doGet(String uri, String queryString) {
+AWSResponse ESPAWSClient::doGet(String uri, String queryString) {
     String request = createRequest("GET", uri, queryString=queryString);
     return send(request);
 }
 
-AWSResponse AWSClient::doPost(String uri, String payload, String contentType, String queryString) {
+AWSResponse ESPAWSClient::doPost(String uri, String payload, String contentType, String queryString) {
     String request = createRequest("POST", uri, payload, contentType, queryString);
     return send(request);
 }
 
-AWSResponse AWSClient::send(const String request) {
+AWSResponse ESPAWSClient::send(const String request) {
     AWSResponse response;
     if (connect(FQDN(), 443)) {
         if (_fingerPrint.length() && !verify(_fingerPrint.c_str(), FQDN().c_str())) {
-            response.body = "Fingerprint mismatch";
+            response.status = 500;
+            response.contentType = F("text/plain");
+            response.body = F("Fingerprint mismatch");
         } else {
+            // Send our request
             print(request);
+            // Read headers
             while (connected()) {
                 String line = readStringUntil('\n');
-                if (line.startsWith("HTTP/1.1 ")) {
+                if (line.startsWith(F("HTTP/1.1 "))) {
                     response.status = line.substring(9, 12).toInt();
+                } else if (line.startsWith(F("Content-Type:"))) {
+                    response.contentType = line.substring(14);
+                } else if (line.startsWith(F("Content-Length:"))) {
+                    response.contentLength = line.substring(15).toInt();
                 } else if (line == "\r") {
                     break;
-                } else {
+                } else if (_responseFields & CAPTURE_HEADERS) {
                     response.headers.concat(line);
                 }
             }
+            // Read body
+            bool saveBody = (_responseFields & CAPTURE_BODY || response.status >= 400 & CAPTURE_BODY_ON_ERROR);
+            if (saveBody) {
+                response.body.reserve(response.contentLength);
+            }
             while (connected()) {
                 while (available()) {
-                    response.body.concat(readString());
+                    String tmp = readString();
+                    if (saveBody) {
+                        response.body.concat(tmp);
+                    }
                 }
             }
         }
     } else {
         response.status = 500;
-        response.body = "Connection failure";
+        response.contentType = F("text/plain");
+        response.body = F("Connection failure");
     }
     stop();
     return response;
 }
 
-String AWSClient::FQDN() {
+String ESPAWSClient::FQDN() {
     String retval;
     if (_customFQDN.length() > 0) {
         retval = _customFQDN;
@@ -117,7 +134,7 @@ String AWSClient::FQDN() {
     return retval;
 }
 
-String AWSClient::hexHash(uint8_t *hash) {
+String ESPAWSClient::hexHash(uint8_t *hash) {
     char hashStr[(HASH_LENGTH * 2) + 1];
     for (int i = 0; i < HASH_LENGTH; ++i) {
         sprintf(hashStr+ 2 * i, "%02lx", 0xff & (unsigned long) hash[i]);
@@ -125,7 +142,7 @@ String AWSClient::hexHash(uint8_t *hash) {
     return String(hashStr);
 }
 
-String AWSClient::createCanonicalHeaders(String contentType, String date, String time, String payloadHash) {
+String ESPAWSClient::createCanonicalHeaders(String contentType, String date, String time, String payloadHash) {
     String retval;
     retval += "content-type:" + contentType + "\n";
     retval += "host:" + FQDN() + "\n";
@@ -134,7 +151,7 @@ String AWSClient::createCanonicalHeaders(String contentType, String date, String
     return retval;
 }
 
-String AWSClient::createRequestHeaders(String contentType, String date, String time, String payload, String payloadHash, String signature) {
+String ESPAWSClient::createRequestHeaders(String contentType, String date, String time, String payload, String payloadHash, String signature) {
     String retval;
     retval += "Content-Type: " + contentType + "\r\n";
     retval += "Connection: close\r\n";
@@ -148,7 +165,7 @@ String AWSClient::createRequestHeaders(String contentType, String date, String t
     return retval;
 }
 
-String AWSClient::createStringToSign(String canonical_request, String date, String time) {
+String ESPAWSClient::createStringToSign(String canonical_request, String date, String time) {
     Sha256.init();
     Sha256.print(canonical_request);
     String hash = hexHash(Sha256.result());
@@ -161,7 +178,7 @@ String AWSClient::createStringToSign(String canonical_request, String date, Stri
     return retval;
 }
 
-String AWSClient::createCanonicalRequest(String method, String uri, String date, String time, String payloadHash, String queryString, String contentType) {
+String ESPAWSClient::createCanonicalRequest(String method, String uri, String date, String time, String payloadHash, String queryString, String contentType) {
     String retval;
     retval += method + "\n";
     retval += uri + "\n";
@@ -172,7 +189,7 @@ String AWSClient::createCanonicalRequest(String method, String uri, String date,
     return retval;
 }
 
-String AWSClient::createSignature(String toSign, String date) {
+String ESPAWSClient::createSignature(String toSign, String date) {
     String key = "AWS4" + _awsSecret;
 
     Sha256.initHmac((uint8_t*)key.c_str(), key.length()); 

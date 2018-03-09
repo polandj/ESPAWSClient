@@ -19,19 +19,32 @@
 
 #include <ESP8266WiFi.h>
 
+typedef enum : uint8_t {
+    CAPTURE_HEADERS = 1,
+    CAPTURE_BODY = 2,
+    CAPTURE_BODY_ON_ERROR = 4
+} AWSResponseFieldMask;
+
 class AWSResponse {
     public:
+        AWSResponse() {
+            status = 0;
+            contentLength = 0;
+        }
         uint16_t status;
+        String contentType;
+        int contentLength;
         String headers;
         String body;
 };
 
-class AWSClient : public WiFiClientSecure {
+class ESPAWSClient : public WiFiClientSecure {
     public:
-        AWSClient(String service, String key, String secret, String host, 
+        ESPAWSClient(String service, String key, String secret, String host, 
                 String region="us-east-1", String TLD="amazonaws.com"); 
         void setCustomFQDN(String fqdn);
         void setFingerPrint(String fp);
+        void setResponseFields(AWSResponseFieldMask fields);
         String createRequest(String method, String uri, String payload="", 
                 String contentType="application/json", String queryString="");
         AWSResponse doGet(String uri, String queryString="");
@@ -47,6 +60,7 @@ class AWSClient : public WiFiClientSecure {
         String _customFQDN;
         String _fingerPrint;
         String _signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+        AWSResponseFieldMask _responseFields = CAPTURE_BODY_ON_ERROR;
 
         String FQDN();
         String hexHash(uint8_t *hash);
