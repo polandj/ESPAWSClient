@@ -15,7 +15,7 @@ const char *host = "ivsxai2qus";
 const char *service = "execute-api";
 const char *key = "YOUR_AWS_IAM_KEY";
 const char *host = "YOUR_AWS_IAM_SECRET";
-const char *uri = "/YOUR_POST_URI";
+const char *uri = "/YOUR_POST_URI"; //The URI will include the stage name if you are not using a custom domain name.
 const char *payload = "{\"key\":true}";
 
 ESPAWSClient aws = ESPAWSClient(service, key, secret, host);
