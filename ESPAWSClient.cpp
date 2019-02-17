@@ -33,10 +33,6 @@ void ESPAWSClient::setCustomFQDN(String fqdn) {
     _customFQDN = fqdn;
 }
 
-void ESPAWSClient::setFingerPrint(String fp) {
-    _fingerPrint = fp;
-}
-
 void ESPAWSClient::setResponseFields(AWSResponseFieldMask fields) {
     _responseFields = fields;
 }
@@ -79,39 +75,33 @@ AWSResponse ESPAWSClient::doPost(String uri, String payload, String contentType,
 AWSResponse ESPAWSClient::send(const String request) {
     AWSResponse response;
     if (connect(FQDN(), 443)) {
-        if (_fingerPrint.length() && !verify(_fingerPrint.c_str(), FQDN().c_str())) {
-            response.status = 500;
-            response.contentType = F("text/plain");
-            response.body = F("Fingerprint mismatch");
-        } else {
-            // Send our request
-            print(request);
-            // Read headers
-            while (connected()) {
-                String line = readStringUntil('\n');
-                if (line.startsWith(F("HTTP/1.1 "))) {
-                    response.status = line.substring(9, 12).toInt();
-                } else if (line.startsWith(F("Content-Type:"))) {
-                    response.contentType = line.substring(14);
-                } else if (line.startsWith(F("Content-Length:"))) {
-                    response.contentLength = line.substring(15).toInt();
-                } else if (line == "\r") {
-                    break;
-                } else if (_responseFields & CAPTURE_HEADERS) {
-                    response.headers.concat(line);
-                }
+        // Send our request
+        print(request);
+        // Read headers
+        while (connected()) {
+            String line = readStringUntil('\n');
+            if (line.startsWith(F("HTTP/1.1 "))) {
+                response.status = line.substring(9, 12).toInt();
+            } else if (line.startsWith(F("Content-Type:"))) {
+                response.contentType = line.substring(14);
+            } else if (line.startsWith(F("Content-Length:"))) {
+                response.contentLength = line.substring(15).toInt();
+            } else if (line == "\r") {
+                break;
+            } else if (_responseFields & CAPTURE_HEADERS) {
+                response.headers.concat(line);
             }
-            // Read body
-            bool saveBody = (_responseFields & CAPTURE_BODY || response.status >= 400 & CAPTURE_BODY_ON_ERROR);
-            if (saveBody) {
-                response.body.reserve(response.contentLength);
-            }
-            while (connected()) {
-                while (available()) {
-                    String tmp = readString();
-                    if (saveBody) {
-                        response.body.concat(tmp);
-                    }
+        }
+        // Read body
+        bool saveBody = (_responseFields & CAPTURE_BODY || response.status >= 400 & CAPTURE_BODY_ON_ERROR);
+        if (saveBody) {
+            response.body.reserve(response.contentLength);
+        }
+        while (connected()) {
+            while (available()) {
+                String tmp = readString();
+                if (saveBody) {
+                    response.body.concat(tmp);
                 }
             }
         }

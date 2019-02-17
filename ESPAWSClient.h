@@ -43,7 +43,6 @@ class ESPAWSClient : public WiFiClientSecure {
         ESPAWSClient(String service, String key, String secret, String host, 
                 String region="us-east-1", String TLD="amazonaws.com"); 
         void setCustomFQDN(String fqdn);
-        void setFingerPrint(String fp);
         void setResponseFields(AWSResponseFieldMask fields);
         String createRequest(String method, String uri, String payload="", 
                 String contentType="application/json", String queryString="");
@@ -58,7 +57,6 @@ class ESPAWSClient : public WiFiClientSecure {
         String _awsKey;
         String _awsSecret;
         String _customFQDN;
-        String _fingerPrint;
         String _signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
         AWSResponseFieldMask _responseFields = CAPTURE_BODY_ON_ERROR;
 

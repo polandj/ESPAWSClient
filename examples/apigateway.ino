@@ -69,6 +69,7 @@ void loop(){
   static uint32_t requests = 0;
   ESPAWSClient aws = ESPAWSClient(service, key, secret, host);
   aws.setCustomFQDN(customDomain);
+  aws.setInsecure(); // Arduino 2.5.0 now requires this unless you set a fingerprint
   char *uuid = "UUID-SAMPLE";
   char uri[50], json[70];
   sprintf(uri, "/device/%s", uuid);

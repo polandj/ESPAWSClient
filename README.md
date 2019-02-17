@@ -19,6 +19,7 @@ const char *uri = "/YOUR_POST_URI"; //The URI will include the stage name if you
 const char *payload = "{\"key\":true}";
 
 ESPAWSClient aws = ESPAWSClient(service, key, secret, host);
+aws.setInsecure(); // Arduino ESP 2.5.0 now needs this
 AWSResponse resp = aws.doPost(uri, payload);
 if (resp.status != 200) {
     Serial.printf("Error: %s", resp.body.c_str());
@@ -35,11 +36,12 @@ aws.setCustomFQDN("api.domain.com");
 ```
 
 ## Verify SSL fingerprint
-You can force SSL fingerprint verification by using the **setFingerPrint** method.
+You can force SSL fingerprint verification by using the **setFingerprint** method.
 
 ```C++
+static const char aws_fp[] PROGMEM = "E5 9A 86..."
 ESPAWSClient aws = ESPAWSClient(service, key, secret, host);
-aws.setFingerPrint("CC AA 48...");
+aws.setFingerprint(aws_fp);
 ```
 
 ## Verify Certs / Client certificates
@@ -57,6 +59,9 @@ You must have the proper **system time** set on your device.  The library uses t
 
 ## Memory
 The ESP8266 typically only has 80K of RAM total.  AWS uses somewhat large certs and TLS 1.2.  Just doing the connection requires around 20K of available HEAP.  More if you add in certificate validation.  If you're adding this to an existing Arduino program, check you're not running out of RAM.
+
+## Arduino 2.5.0
+Arduino switched from AxTLS to BearSSL With release 2.5.0.  That changed the behavior such that it no longer connects without server verification.  The library has been updated to work with 2.5.0, and may not work with prior versions.  Likewise, code using it will need to be updated.  At the very least, to include a call to setInsecure() to mimic previous behavior of not checking.
 
 # Examples
 See the [examples directory](https://github.com/polandj/ESPAWSClient/tree/master/examples) in the source to get started.
